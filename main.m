@@ -15,7 +15,7 @@ delta = 1/6;
 R = ones(1,last);
 
 % Groups of instances
-N = [3 10 20 50 100 200 1000 2000 5000 10000]; % number of consumers at each instance
+N = [];                                        % number of consumers at each instance
                                                % if want to generate a new
                                                % set. To change other
                                                % parameters go to
@@ -30,12 +30,12 @@ generateInstance = false;      % true if want to generate instance
 fromSeed = false;              % true if want to choose seed to generate
                                % false if randomly generated instance
 InstanceSeed = 1;              % choose seed for instance generation (if applicable)
-instanceName = '2018CBA_Instances.mat'; % choose instance name to be loaded (if applicable)
+instanceName = 'filename.mat'; % choose instance name to be loaded (if applicable)
 
 % Optimization
 solveGurobi = true;           % if want to solve each instance using Gurobi via AMPL
                                % (need license for both) 
-modelName = '201802ModelPeakPricing.mod'; % optimization model
+modelName = '201802ModelPeakPricing.md'; % optimization model
 saveResultsGurobi = true;      % save results gurobi
 
 % Heuristics parameters
