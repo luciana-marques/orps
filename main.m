@@ -30,7 +30,7 @@ generateInstance = false;      % true if want to generate instance
 fromSeed = false;              % true if want to choose seed to generate
                                % false if randomly generated instance
 InstanceSeed = 1;              % choose seed for instance generation (if applicable)
-instanceName = 'TesteInstances2.mat'; % choose instance name to be loaded (if applicable)
+instanceName = '2018CBA_Instances.mat'; % choose instance name to be loaded (if applicable)
 
 % Optimization
 solveGurobi = true;           % if want to solve each instance using Gurobi via AMPL
