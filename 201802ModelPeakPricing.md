@@ -1,7 +1,7 @@
 #=====================================================================
 # Demand Response Problem
 # Title: Load Scheduling Model v2 (w/o y[n,a,t])
-# File: .mod
+# File: .md
 # Version: Binary Variables without considering consumers that do not
 # participate in coalition
 # Pricing model: peak pricing
