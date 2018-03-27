@@ -15,10 +15,10 @@ Instances generation
 •	InstanceSeed = v: choose seed value v for instance generation (if “fromSeed = true”);
 •	instanceName = 'name.mat': choose instance name to be loaded (if “generateInstance = false”);
 
-Optimization parameters (need Gurobi and AMPL licenses, as AMPL API for Matlab)
+Optimization parameters (need Gurobi and AMPL licenses, and AMPL API for Matlab)
 
 •	solveGurobi = true/false: set it true if you want to solve each instance using Gurobi via AMPL and false otherwise; 
-•	modelName = '201705ModelPeakPricing.md': this is the integer programming model proposed for exact optimization. You can change it if you want, but you will have to do modifications in the code (because it constructs the parametrization inside Matlab, via AMPL API);
+•	modelName = '201802ModelPeakPricing.md': this is the integer programming model proposed for exact optimization. You can change it if you want, but you will have to do modifications in the code (because it constructs the parametrization inside Matlab, via AMPL API);
 •	saveResultsGurobi = true/false: set it true if you want to save the results of the exact optimization model. A dialog box will appear after the optimization to ask the name of the file you want to save;
 
 Heuristics parameters
