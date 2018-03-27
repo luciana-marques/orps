@@ -3,9 +3,8 @@
 % Modified load
 % Institution: Federal University of Minas Gerais (UFMG)
 % Department: Graduate Program in Electrical Engineering
-% Course: Network Optimization
-% Author: Luciana Sant'Ana Marques Arnoux and Isabella 
-% Date: Set 18th, 2017 at 17:06
+% Author: Luciana Sant'Ana Marques
+% Date: Feb 23th, 2018 at 16:28
 %===============================================================
 
 function [totalCost,totalLoad] = UpdateCost(last, delta, loads, ...

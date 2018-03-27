@@ -10,6 +10,7 @@
 function [loadsNew, appIndex] = Neighborhood(loads, nLoads)
 % Input: 
     % loads: (1 x nLoads) structure with a solution of the loads
+    % nLoads: (1 x 1) 
 % Action:
     % 1- To interruptible:
     % Generate another feasible solution by choosing a consumer n and an 
@@ -39,17 +40,21 @@ function [loadsNew, appIndex] = Neighborhood(loads, nLoads)
     
     % If interruptible load
     if loads(a).isUn == 0
+        
         % Execute Nfirst
         
-            % Sort the solution vector
-            [B,I] = sort(sol);
+        % Sort the solution vector
+        [B,I] = sort(sol);
 
-            % Calculate how much positions are 0
-            C = logical(B);
-            nZeros = size(C(not([C])),2);
+        % Calculate how much positions are 0
+        C = logical(B);
+        nZeros = size(C(not([C])),2);
 
-            % Calculate how much positions are 1
-            nOnes = loads(a).beta - loads(a).alpha + 1 - nZeros;
+        % Calculate how much positions are 1
+        nOnes = loads(a).beta - loads(a).alpha + 1 - nZeros;
+
+        % If appliance has more possible time slots than its duration
+        if (nZeros ~= 0) && (nOnes ~= 0)
 
             % Generate a random position for zeros
             posZeros = randi(nZeros,1,1);
@@ -60,6 +65,8 @@ function [loadsNew, appIndex] = Neighborhood(loads, nLoads)
             % Change variable status for posZeros and posOne at solution vector
             sol(I(posZeros)) = 1;
             sol(I(nZeros+posOnes)) = 0;
+
+        end
             
     % If uninterruptible    
     else

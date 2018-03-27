@@ -2,9 +2,8 @@
 % Calculate Total Cost of a Solution
 % Institution: Federal University of Minas Gerais (UFMG)
 % Department: Graduate Program in Electrical Engineering
-% Course: Network Optimization
-% Author: Luciana Sant'Ana Marques Arnoux and Isabella 
-% Date: Jun 19th, 2017 at 16:47
+% Author: Luciana Sant'Ana Marques
+% Date: Feb 1923th, 2018 at 16:29
 %===============================================================
 
 function [totalCost,totalLoad] = TotalCostF(last, delta, loads, w, pi, pc, ro, R, isPP)

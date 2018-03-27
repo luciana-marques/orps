@@ -1,10 +1,9 @@
 %===============================================================
-% Load Scheduling Problem
+% Load Scheduling Problem with Quadratic Cost
 % Institution: Federal University of Minas Gerais (UFMG)
 % Department: Graduate Program in Electrical Engineering
-% Course: Network Optimization
-% Author: Luciana Sant'Ana Marques Arnoux and Isabella 
-% Date: Jun 14th, 2017 at 11:54
+% Author: Luciana Sant'Ana Marques
+% Date: Feb 20th, 2018 at 16:31
 %===============================================================
 
 % -----------------------------------------------------
@@ -16,7 +15,7 @@ delta = 1/6;
 R = ones(1,last);
 
 % Groups of instances
-N = [3]; % number of consumers at each instance
+N = [3 10 20 50 100 200 1000 2000 5000 10000]; % number of consumers at each instance
                                                % if want to generate a new
                                                % set. To change other
                                                % parameters go to
@@ -26,34 +25,36 @@ N = [3]; % number of consumers at each instance
 isPP = true;                   % do not change it (only PP was implemented)
 
 % Generate or load instance set
-generateInstance = true;       % true if want to generate instance
+generateInstance = false;      % true if want to generate instance
                                % false if want to load existent instance
 fromSeed = false;              % true if want to choose seed to generate
                                % false if randomly generated instance
 InstanceSeed = 1;              % choose seed for instance generation (if applicable)
-instanceName = 'PSCC2018-Instances.mat'; % choose instance name to be loaded (if applicable)
+instanceName = 'TesteInstances2.mat'; % choose instance name to be loaded (if applicable)
 
 % Optimization
-solveGurobi = false;            % if want to solve each instance using Gurobi via AMPL
+solveGurobi = true;           % if want to solve each instance using Gurobi via AMPL
                                % (need license for both) 
-modelName = '201705ModelPeakPricing.md'; % optimization model
+modelName = '201802ModelPeakPricing.mod'; % optimization model
 saveResultsGurobi = true;      % save results gurobi
 
 % Heuristics parameters
 wLocal = true;                 % with local search after each SA best solution improvement
 localAfterSA = true;           % with local search after each SA complete
-maxInitial = 1;                % number of SA runs for each instance
+maxInitial = 30;               % number of SA runs for each instance
 heuristicsRandom = true;       % if want to run the heuristics randomly or using a seed
-HeuristicsSeed = 3;            % choose seed for heuristic procedure (if applicable)
-solveHeuristics = true;        % true if want to solve SA for the group of instances
+HeuristicsSeed = 6;            % choose seed for heuristic procedure (if applicable)
+solveHeuristics = false;        % true if want to solve SA for the group of instances
 loadResults = false;           % true if want to load previous results
-resultsName = '';              % choose results .mat name to load
+resultsName = 'solution-woLocal-smallInstances2-30x.mat'; % choose results .mat name to load
+resultsSaveName = 'solution-TesteInstances2'; % choose results name to save
 saveResultsSA = true;          % save heuristics results 
 alphaIC = .05;                 % type I error for IC calculation
+CIlevel = alphaIC/2;           % Type I Error
+timeLim = 900;                % Time limit for SA and gurobi
 
 % Print convergence plot
 printConvergence = false;      % true if want to print convergence plot at each SA run
-
 
 % -----------------------------------------------------
 % Generate instances w or w/o seed or 
@@ -79,6 +80,14 @@ end
 
 % Define initial temperature for each instance
 if solveHeuristics
+    
+    % Initialize Heuristics
+    if heuristicsRandom
+        rng('shuffle');
+    else
+        rng('default');
+        rng(HeuristicsSeed);
+    end
 
     t0 = zeros(1,size(N,2));
     p = .95;                    % initial acceptance rate
@@ -122,22 +131,16 @@ if solveHeuristics
 
     % Levels for parameters (result from parameters tuning approach)
     alpha = .9;
-    Mk = 30*round(sqrt(N));
-
-    % Initialize Heuristics
-    if heuristicsRandom
-        rng('shuffle');
-    else
-        HeuristicsSeed = 3; 
-        rng('default');
-        rng(HeuristicsSeed);
-    end
+    Mk = 30*round(sqrt(N));  
 
     % Record solutions SA
     bestValue = Inf(size(N,2),maxInitial);
     time = zeros(size(N,2),maxInitial);
     par = zeros(size(N,2),maxInitial);
     bestSolutions = struct('loads', {}, 'loadCurve', {}, 'fo', {}, 'par', {}); 
+    CI = zeros(2,size(N,2));
+    CI_time = zeros(2,size(N,2));
+    CI_par = zeros(2,size(N,2));
 
     for j=1:size(N,2)
 
@@ -152,7 +155,7 @@ if solveHeuristics
 
         % Number of replications of the procedure
         for i = 1:maxInitial
-
+            
             tic
 
             loads = RankingHeuristic(N(1,j),last,delta,loadsOr,...
@@ -164,7 +167,8 @@ if solveHeuristics
 
             % Simulated Annealing
             [optLoads, optTotalCost, costs, loadCurve] = SimulatedAnnealing(t0(1,j),alpha,...
-                    Mk(1,j),last,delta,loads,pi,pc,b,N(1,j)*R,isPP,totalCost,wLocal,localAfterSA,loadCurve);
+                    Mk(1,j),last,delta,loads,pi,pc,b,N(1,j)*R,isPP,totalCost,...
+                    wLocal,localAfterSA,loadCurve, timeLim);
 
             % Calculate PAR
             par(j,i) = max(loadCurve)/mean(loadCurve);
@@ -207,34 +211,58 @@ if solveHeuristics
             end
 
         end
+        
+        % Calculate CI for results
+
+        % CI of results
+        m = bestValue(j,:)';
+        SEM = std(m)/sqrt(length(m));                       % Standard Error
+        TS = tinv([CIlevel  1-CIlevel],length(m)-1);        % T-Score
+        CI(:,j) = repmat(mean(m),2,1) + TS'*SEM;            % Confidence Intervals
+
+        % CI of time
+        m = time(j,:)';
+        SEM = std(m)/sqrt(length(m));                       % Standard Error
+        TS = tinv([CIlevel  1-CIlevel],length(m)-1);        % T-Score
+        CI_time(:,j) = repmat(mean(m),2,1) + TS'*SEM;       % Confidence Intervals
+        
+        % CI of par
+        m = par(j,:)';
+        SEM = std(m)/sqrt(length(m));                       % Standard Error
+        TS = tinv([CIlevel  1-CIlevel],length(m)-1);        % T-Score
+        CI_par(:,j) = repmat(mean(m),2,1) + TS'*SEM;        % Confidence Intervals
+
+        % Save results
+        if saveResultsSA
+           auxN = N(j);
+           auxName = [resultsSaveName '-N=' num2str(N(j))];
+           auxBestValue = bestValue(j,:);
+           auxTime = time(j,:);
+           auxPar = par(j,:);
+           auxBestSolutions = bestSolutions(j);
+           auxInstance = instance(j);
+           auxCI = CI(:,j);
+           auxCItime = CI_time(:,j);
+           auxCIpar = CI_par(:,j);
+           auxMk = Mk(j);
+           auxt0 = t0(j);
+           save(auxName,'alpha','auxMk','auxt0','auxN','heuristicsRandom',...
+                'HeuristicsSeed','generateInstance','InstanceSeed',...
+                'fromSeed','auxBestValue','auxTime','auxPar',...
+                'auxBestSolutions','auxInstance','maxInitial','alphaIC',...
+                'auxCI','auxCItime','auxCIpar')
+        end
 
     end
-   
-    % Calculate CI for results
-
-    % CI of results
-    m = bestValue';
-    CIlevel = alphaIC/2;                                % Type I Error  
-    SEM = std(m)/sqrt(length(m));                       % Standard Error
-    TS = tinv([CIlevel  1-CIlevel],length(m)-1);        % T-Score
-    CI = repmat(mean(m),2,1) + TS'*SEM;                 % Confidence Intervals
-     
-    % CI of time
-    m = time';
-    SEM = std(m)/sqrt(length(m));                       % Standard Error
-    TS = tinv([CIlevel  1-CIlevel],length(m)-1);        % T-Score
-    CI_time = repmat(mean(m),2,1) + TS'*SEM;            % Confidence Intervals
     
     % Save results
     if saveResultsSA
-        prompt = {'Enter name you want for the workspace with SA results:'};
-        dlg_title = 'Input';
-        answer = inputdlg(prompt,dlg_title);
-        save(answer{1},'alpha','Mk','t0','N','heuristicsRandom',...
-            'HeuristicsSeed','generateInstance','InstanceSeed',...
-            'fromSeed','bestValue','time','par','bestSolutions',...
-            'instance','maxInitial','alphaIC','CI','CI_time')
+        save(resultsSaveName,'alpha','Mk','t0','N','heuristicsRandom',...
+                'HeuristicsSeed','generateInstance','InstanceSeed',...
+                'fromSeed','bestValue','time','par','bestSolutions',...
+                'instance','maxInitial','alphaIC','CI','CI_time','CI_par')
     end
+  
 end
 
 % Load results from previous SA runs (for the instance loaded/generated)
@@ -246,8 +274,8 @@ end
 % Solve using Gurobi - AMPL and Gurobi licenses needed
 
 % From optimization (centralized)
-solutionGurobi = zeros(1,size(N,2));
-timeGurobi = zeros(1,size(N,2));
+centSolutions = struct('time', {}, 'fo', {}, 'peak', {}, 'consLoad', {},...
+                'consCost', {}, 'bb', {}, 'gap', {});
 
 % From optimization (decentralized)
 loadCurveDec = zeros(size(N,2),last);
@@ -265,31 +293,25 @@ if solveGurobi
     % Write data frames from instance (fixed for every instances)
     
     % Types of shiftable interruptible loads
-    IS = {'HEAT8'; 'HEAT9'; 'HEAT10'; 'HEAT11'; 'HEAT12'; 'HEAT13'; 'HEAT14';...
-          'HEAT15'; 'HEAT16'; 'HEAT17'; 'HEAT18'; 'HEAT19'; 'HEAT20'; 'HEAT21';...
-          'HEAT22'; 'AC'; 'EVN'; 'EVM'};
+    IS = {'AC'; 'EVN'; 'EVM'};
 
     % Types of shiftable uninterruptible loads
     AS = {'WASHING'; 'DRYER'; 'DISHWASHER'};
    
     % Types of shiftable loads
     S = [AS; IS];
-
-    % Types of basic (non-shiftable) loads
-    NS = {'WATER'; 'LIGHTING'; 'KITCHEN'; 'FRIDGE'; 'FREEZER'; 'OVEN';...
-          'MICROWAVE'; 'TV'; 'DESKTOP'; 'LAPTOT'};
       
     ampl = AMPL;                                 % Create AMPL object
     ampl.read(modelName);                        % Read optimization model
     ampl.setOption('solver', 'gurobi');          % Choose Gurobi as solver
-    ampl.setOption('gurobi_options', 'timelim=900 logfile=logPP.txt');
+    delete 'log.txt'                             % Delete log to write new
+    contlim = 0;
+    ampl.setOption('gurobi_options', 'timelim=900 logfile=log.txt mipgap=1e-4');
     
     ampl.getSet('IS').setValues(IS);             % Assign set IS
     ampl.getSet('AS').setValues(AS);             % Assign set AS
-    ampl.getSet('NS').setValues(NS);             % Assign set NS
     ampl.getParameter('last').setValues(last);   % Assign last
     ampl.getParameter('delta').setValues(delta); % Assign delta
-    
     
     for j=1:size(N,2)
         
@@ -297,7 +319,7 @@ if solveGurobi
         pi = instance(j).pi;
         w = instance(j).w;
         n = N(1,j); 
-        C = transpose([1:n]);
+        C = transpose(1:n);
         pc = instance(j).pc;
         
         % Construct matrices ts, tf, d and L
@@ -338,22 +360,14 @@ if solveGurobi
                     d(k,3) = auxLoads(cont).duration;
                     L(k,3) = auxLoads(cont).power;
                     cont = cont + 1;
-                elseif  strcmp(auxLoads(cont).type, 'HEATING')
-                    for i = 4:18
-                        ts(k,i) = auxLoads(cont).alpha;
-                        tf(k,i) = auxLoads(cont).beta;
-                        d(k,i) = auxLoads(cont).duration;
-                        L(k,i) = auxLoads(cont).power;
-                        cont = cont + 1;
-                    end
                 elseif  strcmp(auxLoads(cont).type, 'AC')
-                    ts(k,19) = auxLoads(cont).alpha;
-                    tf(k,19) = auxLoads(cont).beta;
-                    d(k,19) = auxLoads(cont).duration;
-                    L(k,19) = auxLoads(cont).power;
+                    ts(k,4) = auxLoads(cont).alpha;
+                    tf(k,4) = auxLoads(cont).beta;
+                    d(k,4) = auxLoads(cont).duration;
+                    L(k,4) = auxLoads(cont).power;
                     cont = cont + 1;
                 elseif  strcmp(auxLoads(cont).type, 'EV')
-                    for i = 20:21
+                    for i = 5:6
                         ts(k,i) = auxLoads(cont).alpha;
                         tf(k,i) = auxLoads(cont).beta;
                         d(k,i) = auxLoads(cont).duration;
@@ -379,39 +393,65 @@ if solveGurobi
         c = ampl.getSet('C');                    % Pointer for coalition
         c.setValues(C);                          % Assign consumers set
         ampl.getParameter('pc').setValues(pc);   % Assign peak prices
-    
+        
         tic
         ampl.solve()                             % Solve
-        timeGurobi(1,j) = toc;                   % Get resolution time
+        centSolutions(j).time = toc;             % Get resolution time
         
-        z = ampl.getObjective('coalition_value').getValues;
-        solutionGurobi(1,j) = z.getColumnAsDoubles('val');
+        z = ampl.getObjective('coalition_value');
+        centSolutions(j).fo = z.getValues.getColumnAsDoubles('val');
+                
+        if strcmp({z.result},'limit')
+            contlim = contlim + 1;
+            fid = fopen('log.txt', 'r');
+            s = textscan(fid, '%s', 'delimiter', '\n');
+            aux_indx = find(strcmp(s{1}, 'Time limit reached'));
+            indx = aux_indx(contlim);
+            phrase = split(s{1}{indx+1},',');
+            sphrase = split(phrase{2});
+            centSolutions(j).bb = str2double([sphrase{4}]);
+            sphrase = split(phrase{3});
+            sphrase = split(sphrase{3},'%');
+            centSolutions(j).gap = str2double([sphrase{1}])/100;
+            fclose(fid);
+        else
+            centSolutions(j).bb = centSolutions(j).fo;
+            centSolutions(j).gap = 0;
+        end
         
+        y = ampl.getVariable('P').getValues;     % get load curve
+        total_load = y.getColumnAsDoubles('val');
+        centSolutions(j).consLoad = reshape(total_load,[last,n]);
+        
+        peak = ampl.getVariable('xc').getValues; % get peak
+        centSolutions(j).peak = peak.getColumnAsDoubles('val'); 
+        
+        total_energy = delta*centSolutions(j).consLoad; 
+        costs = pi*total_energy + max(centSolutions(j).consLoad)*pc;
+        centSolutions(j).consCost = costs*centSolutions(j).fo/sum(costs); % proportionally individual cost
+
         % Solve the model for each consumer independently
         tic
         for k = 1:n
-        
-            c.setValues(k);                              % Assign only consumer k to coalition
-            ampl.solve();                                % Solve
-            y = ampl.getVariable('y');                   % Creat object to access variables
-            y = y.getValues;                             % Get value of variable
-            values = y.getColumnAsDoubles('val');        % Transforme variable in MATLAB matrix
-            values = reshape(values,...                  % Reshape matrix to 144
-                [last,size(instance(1).S,2)]); 
-            load = transpose(sum(values,2));             % Transpose vector to 1 x 144
-            loadCurveDec(j,:) = loadCurveDec(j,:)...     % Uptade total load curve
-                + load;
-            z = ampl.getObjective('coalition_value');    % Pointer to objective
-            z = z.getValues.getColumnAsDoubles('val');   % Get objective value
-            bestValuesDec(j,1) = bestValuesDec(j,1) + z; % Sum z to total decentralized cost
-            
+          
+          c.setValues(k);                              % Assign only consumer k to coalition
+          ampl.solve();                                % Solve
+          y = ampl.getVariable('P');                   % Creat object to access variables
+          y = y.getValues;                             % Get value of variable
+          values = y.getColumnAsDoubles('val');        % Transforme variable in MATLAB matrix
+          load = transpose(sum(values,2));             % Transpose vector to 1 x 144
+          loadCurveDec(j,:) = loadCurveDec(j,:)...     % Uptade total load curve
+              + load;
+          z = ampl.getObjective('coalition_value');    % Pointer to objective
+          z = z.getValues.getColumnAsDoubles('val');   % Get objective value
+          bestValuesDec(j,1) = bestValuesDec(j,1) + z; % Sum z to total decentralized cost
+
         end
         
         % Get processing time for n consumers
         timeDec(j,1) = toc;
-        
+         
         % Sum w
-        loadCurveDec(j,:) = loadCurveDec(j,:) + sum(instance(j).w);
         parDec(j,1) = max(loadCurveDec(j,:))/mean(loadCurveDec(j,:));
         
     end
@@ -423,11 +463,10 @@ if solveGurobi
         prompt = {'Enter name you want for the workspace with Gurobi results:'};
         dlg_title = 'Input';
         answer = inputdlg(prompt,dlg_title);
-        save(answer{1},'parDec','timeDec','bestValuesDec','solutionGurobi',...
-            'timeGurobi','loadCurveDec')
+        save(answer{1},'parDec','timeDec','bestValuesDec','centSolutions',...
+            'loadCurveDec')
     end
-    
-    
+   
 end
 
 % -----------------------------------------------------
@@ -465,7 +504,7 @@ for n = 1:size(N,2)
 end
 
 % -----------------------------------------------------
-% Plots
+% Plots and tables
 
 y = 1:last;
 
@@ -473,13 +512,15 @@ for n = 1:size(N,2)
     
     figure
     plot(y,woLoadCurve(n,:)',':',y,loadCurveDec(n,:),'--',...
-        y,bestSolutions(n).loadCurve,'LineWidth',1.1)
+        y,auxBestSolutions.loadCurve,...
+        'LineWidth',1.1)
 
     legend({'W/O Load Scheduling' 'With Decentralized Load Scheduling'...
-        'With Centralized Load Scheduling'},'Location','northwest')
+        'With Centralized Load Scheduling SA' 'With Centralized Load Scheduling Gurobi'},'Location','northwest')
     xlabel('time slot')
     ylabel('load (kW)')
+    axis([0 144 10 65])
 
-    print(['resultPlot' num2str(N(1,n))],'-depsc')
+    print(['resultPlot' num2str(50)],'-depsc')
     
 end
